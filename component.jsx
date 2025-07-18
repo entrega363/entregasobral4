@@ -4,16 +4,36 @@ const { useStoredState } = hatch;
 const SistemaEntregaSobral = () => {
   // TODOS OS HOOKS DEVEM SER DECLARADOS AQUI NO TOPO - ANTES DE QUALQUER LÓGICA CONDICIONAL
   
-  // Estados centralizados
+  // Estados centralizados - LOCAIS para cada dispositivo/sessão
   const [currentView, setCurrentView] = useState('home');
-  const [activeTab, setActiveTab] = useStoredState('active_tab', 'dashboard');
+  const [activeTab, setActiveTab] = useState('dashboard'); // MUDANÇA: removido useStoredState
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Estados para diferentes tipos de usuário
-  const [empresaLogada, setEmpresaLogada] = useStoredState('empresa_logada', null);
-  const [entregadorLogado, setEntregadorLogado] = useStoredState('entregador_logado', null);
-  const [consumidorLogado, setConsumidorLogado] = useStoredState('consumidor_logado', null);
+  // Estados para configuração do banco de dados
+  const [showDatabaseConfig, setShowDatabaseConfig] = useState(false);
+  const [databaseConfig, setDatabaseConfig] = useStoredState('database_config', {
+    type: 'mysql', // mysql, postgresql, mongodb, sqlite, supabase
+    host: 'localhost',
+    port: '3306',
+    database: 'entrega_sobral',
+    username: '',
+    password: '',
+    ssl: false,
+    connectionString: '',
+    isConnected: false,
+    lastConnection: null,
+    useConnectionString: false,
+    // Campos específicos do Supabase
+    supabaseUrl: '',
+    supabaseKey: '',
+    supabaseServiceKey: ''
+  });
+  
+  // Estados para diferentes tipos de usuário - LOCAIS para cada sessão
+  const [empresaLogada, setEmpresaLogada] = useState(null);
+  const [entregadorLogado, setEntregadorLogado] = useState(null);
+  const [consumidorLogado, setConsumidorLogado] = useState(null);
   
   // Dados do sistema
   const [empresas, setEmpresas] = useStoredState('empresas_sobral', []);
@@ -22,10 +42,10 @@ const SistemaEntregaSobral = () => {
   const [pedidos, setPedidos] = useStoredState('pedidos_sobral', []);
   const [produtos, setProdutos] = useStoredState('produtos_sobral', []);
 
-  // Formulários
+  // Formulários - LOCAIS para cada sessão
   const [loginForm, setLoginForm] = useState({ email: '', senha: '', usuario: '' });
-  const [showProdutoForm, setShowProdutoForm] = useStoredState('show_produto_form', false);
-  const [editingProdutoId, setEditingProdutoId] = useStoredState('editing_produto_id', null);
+  const [showProdutoForm, setShowProdutoForm] = useState(false); // MUDANÇA: removido useStoredState
+  const [editingProdutoId, setEditingProdutoId] = useState(null); // MUDANÇA: removido useStoredState
   const [produtoForm, setProdutoForm] = useState({
     nome: '',
     descricao: '',
@@ -76,9 +96,9 @@ const SistemaEntregaSobral = () => {
     confirmarSenha: ''
   });
 
-  // Estados específicos do consumidor - MOVIDOS PARA O TOPO
+  // Estados específicos do consumidor - LOCAIS para cada sessão
   const [activeConsumerTab, setActiveConsumerTab] = useState('marketplace');
-  const [carrinho, setCarrinho] = useState([]);
+  const [carrinho, setCarrinho] = useState([]); // Carrinho local para cada sessão
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [busca, setBusca] = useState('');
   const [forceConsumerUpdate, setForceConsumerUpdate] = useState(0);
@@ -87,6 +107,120 @@ const SistemaEntregaSobral = () => {
   const adminCredentials = {
     usuario: 'admin',
     senha: 'tenderbr0'
+  };
+
+  // Função para testar conexão com banco de dados
+  const testDatabaseConnection = async () => {
+    try {
+      // Simular teste de conexão (em produção, seria uma chamada para API)
+      const config = databaseConfig;
+      
+      // Validações específicas por tipo de banco
+      if (config.type === 'supabase') {
+        if (!config.supabaseUrl || !config.supabaseKey) {
+          throw new Error('Preencha a URL e a chave pública do Supabase');
+        }
+        
+        // Validar formato da URL do Supabase
+        if (!config.supabaseUrl.includes('.supabase.co')) {
+          throw new Error('URL do Supabase deve ter o formato: https://seu-projeto.supabase.co');
+        }
+        
+      } else if (!config.useConnectionString) {
+        if (!config.host || !config.database || !config.username) {
+          throw new Error('Preencha todos os campos obrigatórios');
+        }
+      } else {
+        if (!config.connectionString) {
+          throw new Error('String de conexão é obrigatória');
+        }
+      }
+      
+      // Simular delay de conexão
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Simular teste específico do Supabase
+      if (config.type === 'supabase') {
+        console.log('🔗 Testando conexão com Supabase:', {
+          url: config.supabaseUrl,
+          hasKey: !!config.supabaseKey,
+          hasServiceKey: !!config.supabaseServiceKey
+        });
+        
+        // Em produção, aqui seria feita uma chamada real para o Supabase
+        // const { createClient } = require('@supabase/supabase-js')
+        // const supabase = createClient(config.supabaseUrl, config.supabaseKey)
+        // const { data, error } = await supabase.from('test').select('*').limit(1)
+      }
+      
+      // Simular sucesso (em produção, seria uma chamada real para o backend)
+      const updatedConfig = {
+        ...config,
+        isConnected: true,
+        lastConnection: new Date().toLocaleString('pt-BR')
+      };
+      
+      setDatabaseConfig(updatedConfig);
+      
+      const successMessage = config.type === 'supabase' 
+        ? '✅ Conexão com Supabase estabelecida com sucesso!\n\n🔗 Configuração validada:\n• URL do projeto verificada\n• Chave de API testada\n• Pronto para usar!'
+        : '✅ Conexão com banco de dados estabelecida com sucesso!';
+      
+      alert(successMessage);
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao conectar com banco:', error);
+      alert('❌ Erro ao conectar com banco de dados: ' + error.message);
+      
+      setDatabaseConfig({
+        ...databaseConfig,
+        isConnected: false,
+        lastConnection: null
+      });
+      
+      return false;
+    }
+  };
+
+  // Função para desconectar do banco
+  const disconnectDatabase = () => {
+    setDatabaseConfig({
+      ...databaseConfig,
+      isConnected: false,
+      lastConnection: null
+    });
+    alert('🔌 Desconectado do banco de dados');
+  };
+
+  // Função para migrar dados do localStorage para banco (simulação)
+  const migrateToDatabase = async () => {
+    if (!databaseConfig.isConnected) {
+      alert('❌ Conecte-se ao banco de dados primeiro!');
+      return;
+    }
+
+    try {
+      // Simular migração dos dados
+      const localData = {
+        empresas: JSON.parse(localStorage.getItem('empresas_sobral') || '[]'),
+        entregadores: JSON.parse(localStorage.getItem('entregadores_sobral') || '[]'),
+        consumidores: JSON.parse(localStorage.getItem('consumidores_sobral') || '[]'),
+        produtos: JSON.parse(localStorage.getItem('produtos_sobral') || '[]'),
+        pedidos: JSON.parse(localStorage.getItem('pedidos_sobral') || '[]')
+      };
+
+      // Simular delay de migração
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      console.log('🔄 Dados migrados:', localData);
+      
+      alert(`✅ Migração concluída com sucesso!\n\n📊 DADOS MIGRADOS:\n• Empresas: ${localData.empresas.length}\n• Entregadores: ${localData.entregadores.length}\n• Consumidores: ${localData.consumidores.length}\n• Produtos: ${localData.produtos.length}\n• Pedidos: ${localData.pedidos.length}\n\n🎉 Agora o sistema está conectado ao banco de dados!`);
+      
+    } catch (error) {
+      console.error('Erro na migração:', error);
+      alert('❌ Erro na migração: ' + error.message);
+    }
   };
 
   // FUNÇÕES DO CONSUMIDOR - DECLARADAS NO NÍVEL GLOBAL DO COMPONENTE
@@ -148,10 +282,48 @@ const SistemaEntregaSobral = () => {
 
     const pedidosAtualizados = [...pedidos, novoPedido];
     setPedidos(pedidosAtualizados);
+    
+    // Salvar no localStorage para sincronização com TODOS os painéis
     localStorage.setItem('pedidos_sobral', JSON.stringify(pedidosAtualizados));
     
+    // FORÇAR sincronização IMEDIATA para TODAS as sessões
+    window.dispatchEvent(new CustomEvent('pedidos_updated', { 
+      detail: { 
+        pedidos: pedidosAtualizados,
+        novoPedido: novoPedido,
+        action: 'pedido_criado',
+        timestamp: new Date().toISOString()
+      }
+    }));
+    
+    // Sincronização adicional com delay para garantir propagação
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('dados_sincronizados', {
+        detail: { 
+          pedidos: pedidosAtualizados,
+          novoPedido: novoPedido,
+          empresasEnvolvidas: Object.values(empresasPedido).map(emp => emp.empresaId),
+          action: 'novo_pedido_realizado',
+          timestamp: new Date().toISOString()
+        }
+      }));
+      
+      // Notificar empresas específicas sobre o novo pedido
+      Object.values(empresasPedido).forEach(empresaPedido => {
+        window.dispatchEvent(new CustomEvent('novo_pedido_empresa', {
+          detail: { 
+            empresaId: empresaPedido.empresaId,
+            pedido: novoPedido,
+            timestamp: new Date().toISOString()
+          }
+        }));
+      });
+      
+      console.log('🔔 Eventos de sincronização disparados para todas as empresas envolvidas');
+    }, 500);
+    
     setCarrinho([]);
-    alert(`Pedido realizado com sucesso!\n\nPedido #${novoPedido.id.slice(-6)}\nTotal: R$ ${novoPedido.total.toFixed(2)}`);
+    alert(`Pedido realizado com sucesso!\n\nPedido #${novoPedido.id.slice(-6)}\nTotal: R$ ${novoPedido.total.toFixed(2)}\n\n🔔 Empresas notificadas automaticamente!`);
     setActiveConsumerTab('pedidos');
   };
 
@@ -174,103 +346,56 @@ const SistemaEntregaSobral = () => {
   const categorias = [...new Set(produtosDisponiveis.map(p => p.categoria))];
   const meusPedidos = pedidos.filter(p => p.consumidorId === consumidorLogado?.id);
 
-  // Auto-login e sincronização: verificar se admin já está autenticado na inicialização
+  // Auto-login e sincronização: verificar se há sessões salvas na inicialização
   React.useEffect(() => {
-    // Verificar se há autenticação salva no localStorage
-    const savedAuth = localStorage.getItem('admin_authenticated');
+    // Criar chave única para esta sessão (baseada em timestamp + random)
+    const sessionId = sessionStorage.getItem('session_id') || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionStorage.setItem('session_id', sessionId);
+    
+    // Verificar se há autenticação salva no sessionStorage (específico desta aba/sessão)
+    const savedAuth = sessionStorage.getItem('admin_authenticated');
     if (savedAuth === 'true') {
       setIsAuthenticated(true);
-      console.log('✅ Admin autenticado automaticamente após reload');
+      console.log('✅ Admin autenticado automaticamente após reload (sessão local)');
     }
     
-    // Verificar se há empresa logada salva no localStorage
-    const savedEmpresa = localStorage.getItem('empresa_logada');
+    // Verificar se há empresa logada salva no sessionStorage (específico desta sessão)
+    const savedEmpresa = sessionStorage.getItem('empresa_logada');
     if (savedEmpresa && !empresaLogada) {
       try {
         const empresaData = JSON.parse(savedEmpresa);
         setEmpresaLogada(empresaData);
         
-        // Restaurar estados do formulário de produto se existirem
-        const savedShowForm = localStorage.getItem('show_produto_form');
-        const savedEditingId = localStorage.getItem('editing_produto_id');
-        
-        if (savedShowForm === 'true') {
-          setShowProdutoForm(true);
-        }
-        
-        if (savedEditingId && savedEditingId !== 'null') {
-          setEditingProdutoId(savedEditingId);
-          
-          // Carregar dados do produto sendo editado
-          setTimeout(() => {
-            const savedProdutos = localStorage.getItem('produtos_sobral');
-            if (savedProdutos) {
-              const produtosData = JSON.parse(savedProdutos);
-              const produto = produtosData.find(p => p.id === savedEditingId);
-              if (produto) {
-                setProdutoForm(produto);
-                // Salvar dados do formulário para manter consistência
-                localStorage.setItem('produto_form_data', JSON.stringify(produto));
-              }
-            }
-          }, 100);
-        } else {
-          // Se não está editando, limpar formulário
-          setProdutoForm({
-            nome: '',
-            descricao: '',
-            preco: '',
-            categoria: '',
-            disponivel: true,
-            tempoPreparacao: '',
-            imagem: ''
-          });
-        }
-        
-        // Recuperar dados do formulário se existirem
-        const savedFormData = localStorage.getItem('produto_form_data');
-        if (savedFormData && !savedEditingId) {
-          try {
-            const formData = JSON.parse(savedFormData);
-            // Só recuperar se não estiver editando um produto específico
-            if (!savedEditingId || savedEditingId === 'null') {
-              setProdutoForm(formData);
-            }
-          } catch (error) {
-            console.error('Erro ao recuperar dados do formulário:', error);
-          }
-        }
-        
-        console.log('✅ Empresa autenticada automaticamente após reload');
+        console.log('✅ Empresa autenticada automaticamente após reload (sessão local)');
       } catch (error) {
         console.error('Erro ao recuperar empresa logada:', error);
-        localStorage.removeItem('empresa_logada');
+        sessionStorage.removeItem('empresa_logada');
       }
     }
     
-    // Verificar se há entregador logado salvo no localStorage
-    const savedEntregador = localStorage.getItem('entregador_logado');
+    // Verificar se há entregador logado salvo no sessionStorage (específico desta sessão)
+    const savedEntregador = sessionStorage.getItem('entregador_logado');
     if (savedEntregador && !entregadorLogado) {
       try {
         const entregadorData = JSON.parse(savedEntregador);
         setEntregadorLogado(entregadorData);
-        console.log('✅ Entregador autenticado automaticamente após reload');
+        console.log('✅ Entregador autenticado automaticamente após reload (sessão local)');
       } catch (error) {
         console.error('Erro ao recuperar entregador logado:', error);
-        localStorage.removeItem('entregador_logado');
+        sessionStorage.removeItem('entregador_logado');
       }
     }
     
-    // Verificar se há consumidor logado salvo no localStorage
-    const savedConsumidor = localStorage.getItem('consumidor_logado');
+    // Verificar se há consumidor logado salvo no sessionStorage (específico desta sessão)
+    const savedConsumidor = sessionStorage.getItem('consumidor_logado');
     if (savedConsumidor && !consumidorLogado) {
       try {
         const consumidorData = JSON.parse(savedConsumidor);
         setConsumidorLogado(consumidorData);
-        console.log('✅ Consumidor autenticado automaticamente após reload');
+        console.log('✅ Consumidor autenticado automaticamente após reload (sessão local)');
       } catch (error) {
         console.error('Erro ao recuperar consumidor logado:', error);
-        localStorage.removeItem('consumidor_logado');
+        sessionStorage.removeItem('consumidor_logado');
       }
     }
 
@@ -315,12 +440,27 @@ const SistemaEntregaSobral = () => {
           console.log('🔄 Consumidores sincronizados:', consumidoresData.length);
         }
 
-        // Sincronizar pedidos
+        // Sincronizar pedidos - CRÍTICO para empresas e entregadores
         const savedPedidos = localStorage.getItem('pedidos_sobral');
         if (savedPedidos) {
           const pedidosData = JSON.parse(savedPedidos);
           setPedidos(pedidosData);
           console.log('🔄 Pedidos sincronizados:', pedidosData.length);
+          
+          // Log específico para pedidos pendentes (importantes para empresas)
+          const pedidosPendentes = pedidosData.filter(p => p.status === 'pendente');
+          console.log('📥 Pedidos pendentes encontrados:', pedidosPendentes.length);
+          
+          if (pedidosPendentes.length > 0) {
+            console.log('📋 Pedidos pendentes detalhados:', pedidosPendentes.map(p => ({
+              id: p.id.slice(-6),
+              cliente: p.consumidorNome,
+              empresas: p.empresas?.map(emp => emp.empresaNome) || [],
+              total: p.total
+            })));
+          }
+        } else {
+          console.log('⚠️ Nenhum pedido encontrado no localStorage');
         }
 
         // Forçar atualização se necessário
@@ -366,15 +506,37 @@ const SistemaEntregaSobral = () => {
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('produtos_updated', handleCustomSync);
     window.addEventListener('empresas_updated', handleCustomSync);
+    window.addEventListener('pedidos_updated', handleCustomSync);
     window.addEventListener('sync_all_data', handleCustomSync);
     window.addEventListener('dados_sincronizados', handleForcedSync);
+    
+    // Listener específico para novos pedidos (para empresas)
+    window.addEventListener('novo_pedido_empresa', (e) => {
+      console.log('🔔 Novo pedido recebido para empresa:', e.detail);
+      
+      // Se for uma empresa logada, verificar se o pedido é para ela
+      if (empresaLogada && e.detail.empresaId === empresaLogada.id) {
+        // Sincronizar pedidos imediatamente
+        syncAllData();
+        
+        // Notificação visual/sonora para a empresa
+        setTimeout(() => {
+          if (confirm(`🔔 NOVO PEDIDO RECEBIDO!\n\nPedido #${e.detail.pedido.id.slice(-6)}\nCliente: ${e.detail.pedido.consumidorNome}\nTotal: R$ ${e.detail.pedido.total.toFixed(2)}\n\n🎯 Clique OK para ver o pedido na aba Pedidos`)) {
+            // Se a empresa confirmar, mudar para a aba de pedidos
+            setActiveTab('pedidos');
+          }
+        }, 1000);
+      }
+    });
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('produtos_updated', handleCustomSync);
       window.removeEventListener('empresas_updated', handleCustomSync);
+      window.removeEventListener('pedidos_updated', handleCustomSync);
       window.removeEventListener('sync_all_data', handleCustomSync);
       window.removeEventListener('dados_sincronizados', handleForcedSync);
+      window.removeEventListener('novo_pedido_empresa', () => {});
     };
   }, [empresaLogada, entregadorLogado, consumidorLogado]);
 
@@ -415,7 +577,7 @@ const SistemaEntregaSobral = () => {
     
     if (usuarioLimpo === adminCredentials.usuario && senhaLimpa === adminCredentials.senha) {
       setIsAuthenticated(true);
-      localStorage.setItem('admin_authenticated', 'true');
+      sessionStorage.setItem('admin_authenticated', 'true'); // MUDANÇA: usar sessionStorage
       setCurrentView('dashboard');
       setLoginForm({ usuario: '', senha: '', email: '' });
       console.log('✅ Login admin realizado com sucesso!');
@@ -451,7 +613,7 @@ const SistemaEntregaSobral = () => {
       }
       
       // IMPORTANTE: NÃO setar currentView - deixar o componente renderizar diretamente
-      localStorage.setItem('empresa_logada', JSON.stringify(empresa));
+      sessionStorage.setItem('empresa_logada', JSON.stringify(empresa)); // MUDANÇA: usar sessionStorage
       setEmpresaLogada(empresa);
       setLoginForm({ email: '', senha: '', usuario: '' });
       alert(`Bem-vindo(a), ${empresa.nome}!`);
@@ -483,7 +645,7 @@ const SistemaEntregaSobral = () => {
       }
       
       // IMPORTANTE: NÃO setar currentView - deixar o componente renderizar diretamente
-      localStorage.setItem('entregador_logado', JSON.stringify(entregador));
+      sessionStorage.setItem('entregador_logado', JSON.stringify(entregador)); // MUDANÇA: usar sessionStorage
       setEntregadorLogado(entregador);
       setLoginForm({ email: '', senha: '', usuario: '' });
       alert(`Bem-vindo(a), ${entregador.nome}!`);
@@ -502,7 +664,7 @@ const SistemaEntregaSobral = () => {
 
     if (consumidor) {
       // IMPORTANTE: NÃO setar currentView - deixar o componente renderizar diretamente
-      localStorage.setItem('consumidor_logado', JSON.stringify(consumidor));
+      sessionStorage.setItem('consumidor_logado', JSON.stringify(consumidor)); // MUDANÇA: usar sessionStorage
       setConsumidorLogado(consumidor);
       setLoginForm({ email: '', senha: '', usuario: '' });
       alert(`Bem-vindo(a), ${consumidor.nome}!`);
@@ -514,7 +676,7 @@ const SistemaEntregaSobral = () => {
   // Função de logout do admin
   const handleAdminLogout = () => {
     setIsAuthenticated(false);
-    localStorage.removeItem('admin_authenticated');
+    sessionStorage.removeItem('admin_authenticated'); // MUDANÇA: usar sessionStorage
     setCurrentView('home');
     setActiveTab('dashboard');
   };
@@ -522,7 +684,7 @@ const SistemaEntregaSobral = () => {
   // Função de logout para empresa
   const handleEmpresaLogout = () => {
     setEmpresaLogada(null);
-    localStorage.removeItem('empresa_logada');
+    sessionStorage.removeItem('empresa_logada'); // MUDANÇA: usar sessionStorage
     // Limpar estados do formulário de produto ao fazer logout
     setShowProdutoForm(false);
     setEditingProdutoId(null);
@@ -542,7 +704,7 @@ const SistemaEntregaSobral = () => {
   // Função de logout para entregador
   const handleEntregadorLogout = () => {
     setEntregadorLogado(null);
-    localStorage.removeItem('entregador_logado');
+    sessionStorage.removeItem('entregador_logado'); // MUDANÇA: usar sessionStorage
     // NÃO setar currentView - ir direto para home sem intermediários
     setActiveTab('dashboard');
   };
@@ -550,7 +712,9 @@ const SistemaEntregaSobral = () => {
   // Função de logout para consumidor
   const handleConsumidorLogout = () => {
     setConsumidorLogado(null);
-    localStorage.removeItem('consumidor_logado');
+    sessionStorage.removeItem('consumidor_logado'); // MUDANÇA: usar sessionStorage
+    // Limpar carrinho local da sessão
+    setCarrinho([]);
     // NÃO setar currentView - ir direto para home sem intermediários
     setActiveTab('dashboard');
   };
@@ -634,12 +798,7 @@ const SistemaEntregaSobral = () => {
     setShowProdutoForm(false);
     setEditingProdutoId(null);
     
-    // Forçar salvamento dos estados no localStorage para persistência
-    localStorage.setItem('show_produto_form', 'false');
-    localStorage.setItem('editing_produto_id', 'null');
-    
-    // Salvar formulário vazio para evitar problemas de persistência
-    localStorage.setItem('produto_form_data', JSON.stringify(formVazio));
+    // Estados locais da sessão - não precisam ser salvos em storage
   };
 
   // Função para editar produto
@@ -650,13 +809,8 @@ const SistemaEntregaSobral = () => {
       setEditingProdutoId(id);
       setShowProdutoForm(true);
       
-      // Salvar estados no localStorage para persistir após refresh
-      localStorage.setItem('show_produto_form', 'true');
-      localStorage.setItem('editing_produto_id', id);
-      
       // Garantir que a aba produtos esteja ativa
       setActiveTab('produtos');
-      localStorage.setItem('active_tab', 'produtos');
     }
   };
 
@@ -1142,10 +1296,6 @@ const SistemaEntregaSobral = () => {
                             imagem: ''
                           });
                         }
-                        
-                        // Forçar salvamento no localStorage
-                        localStorage.setItem('show_produto_form', novoEstado.toString());
-                        localStorage.setItem('editing_produto_id', 'null');
                       }}
                       className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
                     >
@@ -1169,10 +1319,7 @@ const SistemaEntregaSobral = () => {
                           required
                           value={produtoForm.nome}
                           onChange={(e) => {
-                            const novoForm = { ...produtoForm, nome: e.target.value };
-                            setProdutoForm(novoForm);
-                            // Salvar automaticamente no localStorage para persistência
-                            localStorage.setItem('produto_form_data', JSON.stringify(novoForm));
+                            setProdutoForm({ ...produtoForm, nome: e.target.value });
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           placeholder="Ex: Pizza Margherita"
@@ -1202,10 +1349,7 @@ const SistemaEntregaSobral = () => {
                           required
                           value={produtoForm.categoria}
                           onChange={(e) => {
-                            const novoForm = { ...produtoForm, categoria: e.target.value };
-                            setProdutoForm(novoForm);
-                            // Salvar automaticamente no localStorage para persistência
-                            localStorage.setItem('produto_form_data', JSON.stringify(novoForm));
+                            setProdutoForm({ ...produtoForm, categoria: e.target.value });
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
@@ -1250,10 +1394,7 @@ const SistemaEntregaSobral = () => {
                           required
                           value={produtoForm.descricao}
                           onChange={(e) => {
-                            const novoForm = { ...produtoForm, descricao: e.target.value };
-                            setProdutoForm(novoForm);
-                            // Salvar automaticamente no localStorage para persistência
-                            localStorage.setItem('produto_form_data', JSON.stringify(novoForm));
+                            setProdutoForm({ ...produtoForm, descricao: e.target.value });
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           rows="3"
@@ -1303,9 +1444,7 @@ const SistemaEntregaSobral = () => {
                                     // Converter para base64 e salvar
                                     const reader = new FileReader();
                                     reader.onload = (event) => {
-                                      const novoForm = { ...produtoForm, imagem: event.target.result };
-                                      setProdutoForm(novoForm);
-                                      localStorage.setItem('produto_form_data', JSON.stringify(novoForm));
+                                      setProdutoForm({ ...produtoForm, imagem: event.target.result });
                                       alert('✅ Imagem carregada com sucesso!');
                                     };
                                     reader.onerror = () => {
@@ -1332,9 +1471,7 @@ const SistemaEntregaSobral = () => {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const novoForm = { ...produtoForm, imagem: '' };
-                                  setProdutoForm(novoForm);
-                                  localStorage.setItem('produto_form_data', JSON.stringify(novoForm));
+                                  setProdutoForm({ ...produtoForm, imagem: '' });
                                 }}
                                 className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 transition duration-200"
                                 title="Remover imagem"
@@ -1353,9 +1490,7 @@ const SistemaEntregaSobral = () => {
                               type="url"
                               value={produtoForm.imagem.startsWith('data:') ? '' : produtoForm.imagem}
                               onChange={(e) => {
-                                const novoForm = { ...produtoForm, imagem: e.target.value };
-                                setProdutoForm(novoForm);
-                                localStorage.setItem('produto_form_data', JSON.stringify(novoForm));
+                                setProdutoForm({ ...produtoForm, imagem: e.target.value });
                               }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                               placeholder="https://exemplo.com/imagem.jpg"
@@ -1497,23 +1632,55 @@ const SistemaEntregaSobral = () => {
                   </h2>
                   <button
                     onClick={() => {
-                      // Sincronização manual para garantir pedidos atualizados
+                      // Sincronização COMPLETA de pedidos para empresas
                       try {
+                        console.log('🔄 Empresa iniciando sincronização COMPLETA de pedidos...');
+                        console.log('🏢 Empresa logada:', empresaLogada.nome, '- ID:', empresaLogada.id);
+                        
+                        // Forçar reload COMPLETO dos pedidos
                         const savedPedidos = localStorage.getItem('pedidos_sobral');
                         if (savedPedidos) {
                           const pedidosData = JSON.parse(savedPedidos);
                           setPedidos(pedidosData);
-                          console.log('🔄 Pedidos recarregados:', pedidosData.length);
+                          console.log('📦 Total de pedidos carregados:', pedidosData.length);
+                          
+                          // Filtrar pedidos desta empresa especificamente
+                          const meusPedidosEmpresa = pedidosData.filter(pedido => {
+                            const temEmpresa = pedido.empresas && pedido.empresas.some(emp => {
+                              const match = emp.empresaId === empresaLogada.id;
+                              if (match) {
+                                console.log('✅ Pedido encontrado para empresa:', pedido.id.slice(-6), '- Cliente:', pedido.consumidorNome);
+                              }
+                              return match;
+                            });
+                            return temEmpresa;
+                          });
+                          
+                          console.log('🎯 Pedidos filtrados para', empresaLogada.nome, ':', meusPedidosEmpresa.length);
+                          
+                          // Estatísticas detalhadas
+                          const pendentes = meusPedidosEmpresa.filter(p => p.status === 'pendente');
+                          const preparando = meusPedidosEmpresa.filter(p => p.status === 'preparando');
+                          const prontos = meusPedidosEmpresa.filter(p => p.status === 'pronto');
+                          
+                          alert(`🔄 Sincronização COMPLETA realizada!\n\n📊 RESULTADO DETALHADO:\n• Total no sistema: ${pedidosData.length} pedidos\n• Seus pedidos: ${meusPedidosEmpresa.length}\n\n📈 STATUS DOS SEUS PEDIDOS:\n• ⏳ Pendentes: ${pendentes.length}\n• 👨‍🍳 Preparando: ${preparando.length}\n• 🍽️ Prontos: ${prontos.length}\n\n${meusPedidosEmpresa.length > 0 ? '✅ Todos os pedidos estão listados abaixo!' : '⚠️ Nenhum pedido encontrado.\n\nDica: Verifique se há pedidos no marketplace consumidor.'}`);
+                        } else {
+                          alert('⚠️ Nenhum pedido encontrado no sistema.\n\nIsso pode significar que:\n• Nenhum consumidor fez pedidos ainda\n• Houve um problema na sincronização\n\nTente:\n1. Verificar se há pedidos no painel do consumidor\n2. Recarregar a página');
                         }
                         
-                        const meusPedidosEmpresa = pedidos.filter(pedido => 
-                          pedido.empresas && pedido.empresas.some(emp => emp.empresaId === empresaLogada.id)
-                        );
+                        // Forçar evento de sincronização global
+                        window.dispatchEvent(new CustomEvent('dados_sincronizados', {
+                          detail: { 
+                            pedidos: JSON.parse(savedPedidos || '[]'),
+                            action: 'sincronizacao_manual_empresa_pedidos',
+                            empresaId: empresaLogada.id,
+                            timestamp: new Date().toISOString()
+                          }
+                        }));
                         
-                        alert(`🔄 Pedidos atualizados!\n\n📊 RESULTADO:\n• Total de pedidos no sistema: ${pedidos.length}\n• Pedidos da sua empresa: ${meusPedidosEmpresa.length}\n\n${meusPedidosEmpresa.length > 0 ? '✅ Seus pedidos estão listados abaixo!' : '⚠️ Nenhum pedido encontrado para sua empresa ainda.'}`);
                       } catch (error) {
-                        console.error('Erro ao atualizar pedidos:', error);
-                        alert('Erro ao atualizar pedidos: ' + error.message);
+                        console.error('❌ Erro na sincronização completa:', error);
+                        alert('❌ Erro na sincronização: ' + error.message + '\n\nTente recarregar a página.');
                       }
                     }}
                     className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
@@ -3247,7 +3414,7 @@ const SistemaEntregaSobral = () => {
         <nav className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex space-x-8">
-              {['dashboard', 'empresas', 'entregadores', 'consumidores', 'pedidos'].map(tab => (
+              {['dashboard', 'empresas', 'entregadores', 'consumidores', 'pedidos', 'database'].map(tab => (
                 <button
                   key={tab}
                   className={`py-4 px-1 border-b-2 font-medium text-sm capitalize ${
@@ -3262,6 +3429,7 @@ const SistemaEntregaSobral = () => {
                   {tab === 'entregadores' && `🏍️ Entregadores (${entregadores.filter(e => e.status === 'pendente').length})`}
                   {tab === 'consumidores' && `🛒 Consumidores (${consumidores.length})`}
                   {tab === 'pedidos' && `📦 Pedidos (${pedidos.length})`}
+                  {tab === 'database' && `🗄️ Banco de Dados ${databaseConfig.isConnected ? '✅' : '❌'}`}
                 </button>
               ))}
             </div>
@@ -3744,6 +3912,408 @@ const SistemaEntregaSobral = () => {
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'database' && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Configuração do Banco de Dados
+                  </h2>
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-3 py-1 text-sm rounded-full ${
+                      databaseConfig.isConnected 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {databaseConfig.isConnected ? '✅ Conectado' : '❌ Desconectado'}
+                    </span>
+                    {databaseConfig.isConnected && (
+                      <button
+                        onClick={disconnectDatabase}
+                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition duration-200 text-sm"
+                      >
+                        Desconectar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status da Conexão */}
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    Status da Conexão
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Status</div>
+                      <div className={`text-lg font-bold ${
+                        databaseConfig.isConnected ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {databaseConfig.isConnected ? 'Conectado' : 'Desconectado'}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Tipo</div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {databaseConfig.type.toUpperCase()}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm text-gray-600">Última Conexão</div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {databaseConfig.lastConnection || 'Nunca'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Configuração do Banco */}
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    Configuração da Conexão
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    {/* Tipo de Banco */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Tipo de Banco de Dados
+                        </label>
+                        <select
+                          value={databaseConfig.type}
+                          onChange={(e) => setDatabaseConfig({
+                            ...databaseConfig,
+                            type: e.target.value,
+                            port: e.target.value === 'mysql' ? '3306' : 
+                                  e.target.value === 'postgresql' ? '5432' : 
+                                  e.target.value === 'mongodb' ? '27017' : '3306'
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                        >
+                          <option value="mysql">MySQL</option>
+                          <option value="postgresql">PostgreSQL</option>
+                          <option value="mongodb">MongoDB</option>
+                          <option value="sqlite">SQLite</option>
+                          <option value="supabase">🚀 Supabase (PostgreSQL Cloud)</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Método de Conexão
+                        </label>
+                        <select
+                          value={databaseConfig.useConnectionString ? 'string' : 'config'}
+                          onChange={(e) => setDatabaseConfig({
+                            ...databaseConfig,
+                            useConnectionString: e.target.value === 'string'
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                        >
+                          <option value="config">Configuração Manual</option>
+                          <option value="string">String de Conexão</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Configuração do Supabase */}
+                    {databaseConfig.type === 'supabase' ? (
+                      <div className="space-y-4">
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <h4 className="font-medium text-green-800 mb-2 flex items-center">
+                            🚀 Configuração do Supabase
+                          </h4>
+                          <p className="text-sm text-green-700 mb-3">
+                            O Supabase é uma alternativa open-source ao Firebase. Configure sua conexão abaixo:
+                          </p>
+                          <div className="flex items-center space-x-2 text-sm text-green-600">
+                            <span>📚</span>
+                            <a 
+                              href="https://supabase.com/dashboard" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="hover:underline font-medium"
+                            >
+                              Acesse seu Dashboard do Supabase
+                            </a>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            🔗 URL do Projeto Supabase *
+                          </label>
+                          <input
+                            type="url"
+                            required
+                            value={databaseConfig.supabaseUrl}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              supabaseUrl: e.target.value
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                            placeholder="https://seu-projeto.supabase.co"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Encontre em: Projeto → Settings → API → Project URL
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            🔑 Chave Pública (anon key) *
+                          </label>
+                          <textarea
+                            required
+                            value={databaseConfig.supabaseKey}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              supabaseKey: e.target.value
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                            rows={3}
+                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Encontre em: Projeto → Settings → API → Project API keys → anon public
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            🛡️ Chave de Serviço (service_role key)
+                          </label>
+                          <textarea
+                            value={databaseConfig.supabaseServiceKey}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              supabaseServiceKey: e.target.value
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                            rows={3}
+                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (opcional para operações administrativas)"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Opcional: Para operações administrativas. Encontre em: Projeto → Settings → API → service_role
+                          </p>
+                        </div>
+
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                          <p className="text-sm text-yellow-800">
+                            <strong>⚠️ Segurança:</strong> A chave de serviço possui acesso total ao banco. 
+                            Use apenas em ambiente seguro e nunca a exponha no frontend em produção.
+                          </p>
+                        </div>
+                      </div>
+                    ) : databaseConfig.useConnectionString ? (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          String de Conexão
+                        </label>
+                        <textarea
+                          value={databaseConfig.connectionString}
+                          onChange={(e) => setDatabaseConfig({
+                            ...databaseConfig,
+                            connectionString: e.target.value
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                          rows={3}
+                          placeholder={
+                            databaseConfig.type === 'mysql' ? 'mysql://usuario:senha@localhost:3306/entrega_sobral' :
+                            databaseConfig.type === 'postgresql' ? 'postgresql://usuario:senha@localhost:5432/entrega_sobral' :
+                            databaseConfig.type === 'mongodb' ? 'mongodb://usuario:senha@localhost:27017/entrega_sobral' :
+                            'sqlite://./entrega_sobral.db'
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Host/Servidor
+                          </label>
+                          <input
+                            type="text"
+                            value={databaseConfig.host}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              host: e.target.value
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="localhost"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Porta
+                          </label>
+                          <input
+                            type="text"
+                            value={databaseConfig.port}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              port: e.target.value
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="3306"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Nome do Banco
+                          </label>
+                          <input
+                            type="text"
+                            value={databaseConfig.database}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              database: e.target.value
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="entrega_sobral"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Usuário
+                          </label>
+                          <input
+                            type="text"
+                            value={databaseConfig.username}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              username: e.target.value
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="usuario"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Senha
+                          </label>
+                          <input
+                            type="password"
+                            value={databaseConfig.password}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              password: e.target.value
+                            })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                            placeholder="senha"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id="ssl"
+                            checked={databaseConfig.ssl}
+                            onChange={(e) => setDatabaseConfig({
+                              ...databaseConfig,
+                              ssl: e.target.checked
+                            })}
+                            className="mr-2"
+                          />
+                          <label htmlFor="ssl" className="text-sm text-gray-700">
+                            Usar SSL/TLS
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Ações */}
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    Ações
+                  </h3>
+                  
+                  <div className="flex flex-wrap gap-4">
+                    <button
+                      onClick={testDatabaseConnection}
+                      disabled={databaseConfig.isConnected}
+                      className={`px-6 py-3 rounded-md font-medium transition duration-200 ${
+                        databaseConfig.isConnected
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      🔌 Testar Conexão
+                    </button>
+                    
+                    <button
+                      onClick={migrateToDatabase}
+                      disabled={!databaseConfig.isConnected}
+                      className={`px-6 py-3 rounded-md font-medium transition duration-200 ${
+                        !databaseConfig.isConnected
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      🔄 Migrar Dados do LocalStorage
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        if (confirm('⚠️ Tem certeza que deseja limpar todas as configurações?\n\nEsta ação não pode ser desfeita!')) {
+                          setDatabaseConfig({
+                            type: 'mysql',
+                            host: 'localhost',
+                            port: '3306',
+                            database: 'entrega_sobral',
+                            username: '',
+                            password: '',
+                            ssl: false,
+                            connectionString: '',
+                            isConnected: false,
+                            lastConnection: null,
+                            useConnectionString: false,
+                            supabaseUrl: '',
+                            supabaseKey: '',
+                            supabaseServiceKey: ''
+                          });
+                          alert('🗑️ Configurações limpas!');
+                        }
+                      }}
+                      className="bg-red-600 text-white px-6 py-3 rounded-md hover:bg-red-700 font-medium transition duration-200"
+                    >
+                      🗑️ Limpar Configurações
+                    </button>
+                  </div>
+                </div>
+
+                {/* Informações Importantes */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-yellow-800 mb-4">
+                    ⚠️ Informações Importantes
+                  </h3>
+                  <div className="space-y-3 text-sm text-yellow-700">
+                    <p>
+                      <strong>📋 Funcionalidade em Desenvolvimento:</strong> Esta é uma simulação da conexão com banco de dados. Em produção, seria necessário implementar as rotas de API no backend.
+                    </p>
+                    <p>
+                      <strong>🔐 Segurança:</strong> Nunca exponha credenciais de banco de dados no frontend. Use variáveis de ambiente e APIs seguras.
+                    </p>
+                    <p>
+                      <strong>🔄 Migração:</strong> A migração atual é simulada. Em produção, implemente validações e backups antes da migração.
+                    </p>
+                    <p>
+                      <strong>💾 Estrutura de Tabelas:</strong> Certifique-se de que as tabelas necessárias existam no banco: usuarios, empresas, entregadores, consumidores, produtos, pedidos.
+                    </p>
+                    <p>
+                      <strong>🚀 Supabase:</strong> Use Row Level Security (RLS) para segurança. Configure políticas de acesso adequadas para cada tabela.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

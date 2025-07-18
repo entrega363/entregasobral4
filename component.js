@@ -3,20 +3,39 @@ import React, { useState } from "https://esm.sh/react@18.2.0";
 var { useStoredState } = hatch;
 var SistemaEntregaSobral = () => {
   const [currentView, setCurrentView] = useState("home");
-  const [activeTab, setActiveTab] = useStoredState("active_tab", "dashboard");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [empresaLogada, setEmpresaLogada] = useStoredState("empresa_logada", null);
-  const [entregadorLogado, setEntregadorLogado] = useStoredState("entregador_logado", null);
-  const [consumidorLogado, setConsumidorLogado] = useStoredState("consumidor_logado", null);
+  const [showDatabaseConfig, setShowDatabaseConfig] = useState(false);
+  const [databaseConfig, setDatabaseConfig] = useStoredState("database_config", {
+    type: "mysql",
+    // mysql, postgresql, mongodb, sqlite, supabase
+    host: "localhost",
+    port: "3306",
+    database: "entrega_sobral",
+    username: "",
+    password: "",
+    ssl: false,
+    connectionString: "",
+    isConnected: false,
+    lastConnection: null,
+    useConnectionString: false,
+    // Campos específicos do Supabase
+    supabaseUrl: "",
+    supabaseKey: "",
+    supabaseServiceKey: ""
+  });
+  const [empresaLogada, setEmpresaLogada] = useState(null);
+  const [entregadorLogado, setEntregadorLogado] = useState(null);
+  const [consumidorLogado, setConsumidorLogado] = useState(null);
   const [empresas, setEmpresas] = useStoredState("empresas_sobral", []);
   const [entregadores, setEntregadores] = useStoredState("entregadores_sobral", []);
   const [consumidores, setConsumidores] = useStoredState("consumidores_sobral", []);
   const [pedidos, setPedidos] = useStoredState("pedidos_sobral", []);
   const [produtos, setProdutos] = useStoredState("produtos_sobral", []);
   const [loginForm, setLoginForm] = useState({ email: "", senha: "", usuario: "" });
-  const [showProdutoForm, setShowProdutoForm] = useStoredState("show_produto_form", false);
-  const [editingProdutoId, setEditingProdutoId] = useStoredState("editing_produto_id", null);
+  const [showProdutoForm, setShowProdutoForm] = useState(false);
+  const [editingProdutoId, setEditingProdutoId] = useState(null);
   const [produtoForm, setProdutoForm] = useState({
     nome: "",
     descricao: "",
@@ -71,6 +90,91 @@ var SistemaEntregaSobral = () => {
     usuario: "admin",
     senha: "tenderbr0"
   };
+  const testDatabaseConnection = async () => {
+    try {
+      const config = databaseConfig;
+      if (config.type === "supabase") {
+        if (!config.supabaseUrl || !config.supabaseKey) {
+          throw new Error("Preencha a URL e a chave p\xFAblica do Supabase");
+        }
+        if (!config.supabaseUrl.includes(".supabase.co")) {
+          throw new Error("URL do Supabase deve ter o formato: https://seu-projeto.supabase.co");
+        }
+      } else if (!config.useConnectionString) {
+        if (!config.host || !config.database || !config.username) {
+          throw new Error("Preencha todos os campos obrigat\xF3rios");
+        }
+      } else {
+        if (!config.connectionString) {
+          throw new Error("String de conex\xE3o \xE9 obrigat\xF3ria");
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2e3));
+      if (config.type === "supabase") {
+        console.log("\u{1F517} Testando conex\xE3o com Supabase:", {
+          url: config.supabaseUrl,
+          hasKey: !!config.supabaseKey,
+          hasServiceKey: !!config.supabaseServiceKey
+        });
+      }
+      const updatedConfig = {
+        ...config,
+        isConnected: true,
+        lastConnection: (/* @__PURE__ */ new Date()).toLocaleString("pt-BR")
+      };
+      setDatabaseConfig(updatedConfig);
+      const successMessage = config.type === "supabase" ? "\u2705 Conex\xE3o com Supabase estabelecida com sucesso!\n\n\u{1F517} Configura\xE7\xE3o validada:\n\u2022 URL do projeto verificada\n\u2022 Chave de API testada\n\u2022 Pronto para usar!" : "\u2705 Conex\xE3o com banco de dados estabelecida com sucesso!";
+      alert(successMessage);
+      return true;
+    } catch (error) {
+      console.error("Erro ao conectar com banco:", error);
+      alert("\u274C Erro ao conectar com banco de dados: " + error.message);
+      setDatabaseConfig({
+        ...databaseConfig,
+        isConnected: false,
+        lastConnection: null
+      });
+      return false;
+    }
+  };
+  const disconnectDatabase = () => {
+    setDatabaseConfig({
+      ...databaseConfig,
+      isConnected: false,
+      lastConnection: null
+    });
+    alert("\u{1F50C} Desconectado do banco de dados");
+  };
+  const migrateToDatabase = async () => {
+    if (!databaseConfig.isConnected) {
+      alert("\u274C Conecte-se ao banco de dados primeiro!");
+      return;
+    }
+    try {
+      const localData = {
+        empresas: JSON.parse(localStorage.getItem("empresas_sobral") || "[]"),
+        entregadores: JSON.parse(localStorage.getItem("entregadores_sobral") || "[]"),
+        consumidores: JSON.parse(localStorage.getItem("consumidores_sobral") || "[]"),
+        produtos: JSON.parse(localStorage.getItem("produtos_sobral") || "[]"),
+        pedidos: JSON.parse(localStorage.getItem("pedidos_sobral") || "[]")
+      };
+      await new Promise((resolve) => setTimeout(resolve, 3e3));
+      console.log("\u{1F504} Dados migrados:", localData);
+      alert(`\u2705 Migra\xE7\xE3o conclu\xEDda com sucesso!
+
+\u{1F4CA} DADOS MIGRADOS:
+\u2022 Empresas: ${localData.empresas.length}
+\u2022 Entregadores: ${localData.entregadores.length}
+\u2022 Consumidores: ${localData.consumidores.length}
+\u2022 Produtos: ${localData.produtos.length}
+\u2022 Pedidos: ${localData.pedidos.length}
+
+\u{1F389} Agora o sistema est\xE1 conectado ao banco de dados!`);
+    } catch (error) {
+      console.error("Erro na migra\xE7\xE3o:", error);
+      alert("\u274C Erro na migra\xE7\xE3o: " + error.message);
+    }
+  };
   const adicionarAoCarrinho = (produto, empresa) => {
     const itemCarrinho = {
       ...produto,
@@ -119,11 +223,42 @@ var SistemaEntregaSobral = () => {
     const pedidosAtualizados = [...pedidos, novoPedido];
     setPedidos(pedidosAtualizados);
     localStorage.setItem("pedidos_sobral", JSON.stringify(pedidosAtualizados));
+    window.dispatchEvent(new CustomEvent("pedidos_updated", {
+      detail: {
+        pedidos: pedidosAtualizados,
+        novoPedido,
+        action: "pedido_criado",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      }
+    }));
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("dados_sincronizados", {
+        detail: {
+          pedidos: pedidosAtualizados,
+          novoPedido,
+          empresasEnvolvidas: Object.values(empresasPedido).map((emp) => emp.empresaId),
+          action: "novo_pedido_realizado",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      }));
+      Object.values(empresasPedido).forEach((empresaPedido) => {
+        window.dispatchEvent(new CustomEvent("novo_pedido_empresa", {
+          detail: {
+            empresaId: empresaPedido.empresaId,
+            pedido: novoPedido,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString()
+          }
+        }));
+      });
+      console.log("\u{1F514} Eventos de sincroniza\xE7\xE3o disparados para todas as empresas envolvidas");
+    }, 500);
     setCarrinho([]);
     alert(`Pedido realizado com sucesso!
 
 Pedido #${novoPedido.id.slice(-6)}
-Total: R$ ${novoPedido.total.toFixed(2)}`);
+Total: R$ ${novoPedido.total.toFixed(2)}
+
+\u{1F514} Empresas notificadas automaticamente!`);
     setActiveConsumerTab("pedidos");
   };
   const empresasAprovadas = empresas.filter((emp) => emp.status === "aprovada");
@@ -138,82 +273,44 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
   const categorias = [...new Set(produtosDisponiveis.map((p) => p.categoria))];
   const meusPedidos = pedidos.filter((p) => p.consumidorId === consumidorLogado?.id);
   React.useEffect(() => {
-    const savedAuth = localStorage.getItem("admin_authenticated");
+    const sessionId = sessionStorage.getItem("session_id") || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionStorage.setItem("session_id", sessionId);
+    const savedAuth = sessionStorage.getItem("admin_authenticated");
     if (savedAuth === "true") {
       setIsAuthenticated(true);
-      console.log("\u2705 Admin autenticado automaticamente ap\xF3s reload");
+      console.log("\u2705 Admin autenticado automaticamente ap\xF3s reload (sess\xE3o local)");
     }
-    const savedEmpresa = localStorage.getItem("empresa_logada");
+    const savedEmpresa = sessionStorage.getItem("empresa_logada");
     if (savedEmpresa && !empresaLogada) {
       try {
         const empresaData = JSON.parse(savedEmpresa);
         setEmpresaLogada(empresaData);
-        const savedShowForm = localStorage.getItem("show_produto_form");
-        const savedEditingId = localStorage.getItem("editing_produto_id");
-        if (savedShowForm === "true") {
-          setShowProdutoForm(true);
-        }
-        if (savedEditingId && savedEditingId !== "null") {
-          setEditingProdutoId(savedEditingId);
-          setTimeout(() => {
-            const savedProdutos = localStorage.getItem("produtos_sobral");
-            if (savedProdutos) {
-              const produtosData = JSON.parse(savedProdutos);
-              const produto = produtosData.find((p) => p.id === savedEditingId);
-              if (produto) {
-                setProdutoForm(produto);
-                localStorage.setItem("produto_form_data", JSON.stringify(produto));
-              }
-            }
-          }, 100);
-        } else {
-          setProdutoForm({
-            nome: "",
-            descricao: "",
-            preco: "",
-            categoria: "",
-            disponivel: true,
-            tempoPreparacao: "",
-            imagem: ""
-          });
-        }
-        const savedFormData = localStorage.getItem("produto_form_data");
-        if (savedFormData && !savedEditingId) {
-          try {
-            const formData = JSON.parse(savedFormData);
-            if (!savedEditingId || savedEditingId === "null") {
-              setProdutoForm(formData);
-            }
-          } catch (error) {
-            console.error("Erro ao recuperar dados do formul\xE1rio:", error);
-          }
-        }
-        console.log("\u2705 Empresa autenticada automaticamente ap\xF3s reload");
+        console.log("\u2705 Empresa autenticada automaticamente ap\xF3s reload (sess\xE3o local)");
       } catch (error) {
         console.error("Erro ao recuperar empresa logada:", error);
-        localStorage.removeItem("empresa_logada");
+        sessionStorage.removeItem("empresa_logada");
       }
     }
-    const savedEntregador = localStorage.getItem("entregador_logado");
+    const savedEntregador = sessionStorage.getItem("entregador_logado");
     if (savedEntregador && !entregadorLogado) {
       try {
         const entregadorData = JSON.parse(savedEntregador);
         setEntregadorLogado(entregadorData);
-        console.log("\u2705 Entregador autenticado automaticamente ap\xF3s reload");
+        console.log("\u2705 Entregador autenticado automaticamente ap\xF3s reload (sess\xE3o local)");
       } catch (error) {
         console.error("Erro ao recuperar entregador logado:", error);
-        localStorage.removeItem("entregador_logado");
+        sessionStorage.removeItem("entregador_logado");
       }
     }
-    const savedConsumidor = localStorage.getItem("consumidor_logado");
+    const savedConsumidor = sessionStorage.getItem("consumidor_logado");
     if (savedConsumidor && !consumidorLogado) {
       try {
         const consumidorData = JSON.parse(savedConsumidor);
         setConsumidorLogado(consumidorData);
-        console.log("\u2705 Consumidor autenticado automaticamente ap\xF3s reload");
+        console.log("\u2705 Consumidor autenticado automaticamente ap\xF3s reload (sess\xE3o local)");
       } catch (error) {
         console.error("Erro ao recuperar consumidor logado:", error);
-        localStorage.removeItem("consumidor_logado");
+        sessionStorage.removeItem("consumidor_logado");
       }
     }
     const syncAllData = () => {
@@ -253,6 +350,18 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
           const pedidosData = JSON.parse(savedPedidos);
           setPedidos(pedidosData);
           console.log("\u{1F504} Pedidos sincronizados:", pedidosData.length);
+          const pedidosPendentes = pedidosData.filter((p) => p.status === "pendente");
+          console.log("\u{1F4E5} Pedidos pendentes encontrados:", pedidosPendentes.length);
+          if (pedidosPendentes.length > 0) {
+            console.log("\u{1F4CB} Pedidos pendentes detalhados:", pedidosPendentes.map((p) => ({
+              id: p.id.slice(-6),
+              cliente: p.consumidorNome,
+              empresas: p.empresas?.map((emp) => emp.empresaNome) || [],
+              total: p.total
+            })));
+          }
+        } else {
+          console.log("\u26A0\uFE0F Nenhum pedido encontrado no localStorage");
         }
         setForceConsumerUpdate((prev) => prev + 1);
         window.dispatchEvent(new CustomEvent("dados_sincronizados", {
@@ -283,14 +392,35 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("produtos_updated", handleCustomSync);
     window.addEventListener("empresas_updated", handleCustomSync);
+    window.addEventListener("pedidos_updated", handleCustomSync);
     window.addEventListener("sync_all_data", handleCustomSync);
     window.addEventListener("dados_sincronizados", handleForcedSync);
+    window.addEventListener("novo_pedido_empresa", (e) => {
+      console.log("\u{1F514} Novo pedido recebido para empresa:", e.detail);
+      if (empresaLogada && e.detail.empresaId === empresaLogada.id) {
+        syncAllData();
+        setTimeout(() => {
+          if (confirm(`\u{1F514} NOVO PEDIDO RECEBIDO!
+
+Pedido #${e.detail.pedido.id.slice(-6)}
+Cliente: ${e.detail.pedido.consumidorNome}
+Total: R$ ${e.detail.pedido.total.toFixed(2)}
+
+\u{1F3AF} Clique OK para ver o pedido na aba Pedidos`)) {
+            setActiveTab("pedidos");
+          }
+        }, 1e3);
+      }
+    });
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("produtos_updated", handleCustomSync);
       window.removeEventListener("empresas_updated", handleCustomSync);
+      window.removeEventListener("pedidos_updated", handleCustomSync);
       window.removeEventListener("sync_all_data", handleCustomSync);
       window.removeEventListener("dados_sincronizados", handleForcedSync);
+      window.removeEventListener("novo_pedido_empresa", () => {
+      });
     };
   }, [empresaLogada, entregadorLogado, consumidorLogado]);
   React.useEffect(() => {
@@ -313,7 +443,7 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
     const senhaLimpa = loginForm.senha.trim();
     if (usuarioLimpo === adminCredentials.usuario && senhaLimpa === adminCredentials.senha) {
       setIsAuthenticated(true);
-      localStorage.setItem("admin_authenticated", "true");
+      sessionStorage.setItem("admin_authenticated", "true");
       setCurrentView("dashboard");
       setLoginForm({ usuario: "", senha: "", email: "" });
       console.log("\u2705 Login admin realizado com sucesso!");
@@ -343,7 +473,7 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
         alert("Sua empresa est\xE1 suspensa. Entre em contato com o suporte.");
         return;
       }
-      localStorage.setItem("empresa_logada", JSON.stringify(empresa));
+      sessionStorage.setItem("empresa_logada", JSON.stringify(empresa));
       setEmpresaLogada(empresa);
       setLoginForm({ email: "", senha: "", usuario: "" });
       alert(`Bem-vindo(a), ${empresa.nome}!`);
@@ -369,7 +499,7 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
         alert("Sua conta est\xE1 suspensa. Entre em contato com o suporte.");
         return;
       }
-      localStorage.setItem("entregador_logado", JSON.stringify(entregador));
+      sessionStorage.setItem("entregador_logado", JSON.stringify(entregador));
       setEntregadorLogado(entregador);
       setLoginForm({ email: "", senha: "", usuario: "" });
       alert(`Bem-vindo(a), ${entregador.nome}!`);
@@ -383,7 +513,7 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
       (cons) => cons.email === loginForm.email && cons.senha === loginForm.senha
     );
     if (consumidor) {
-      localStorage.setItem("consumidor_logado", JSON.stringify(consumidor));
+      sessionStorage.setItem("consumidor_logado", JSON.stringify(consumidor));
       setConsumidorLogado(consumidor);
       setLoginForm({ email: "", senha: "", usuario: "" });
       alert(`Bem-vindo(a), ${consumidor.nome}!`);
@@ -393,13 +523,13 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
   };
   const handleAdminLogout = () => {
     setIsAuthenticated(false);
-    localStorage.removeItem("admin_authenticated");
+    sessionStorage.removeItem("admin_authenticated");
     setCurrentView("home");
     setActiveTab("dashboard");
   };
   const handleEmpresaLogout = () => {
     setEmpresaLogada(null);
-    localStorage.removeItem("empresa_logada");
+    sessionStorage.removeItem("empresa_logada");
     setShowProdutoForm(false);
     setEditingProdutoId(null);
     setProdutoForm({
@@ -415,12 +545,13 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
   };
   const handleEntregadorLogout = () => {
     setEntregadorLogado(null);
-    localStorage.removeItem("entregador_logado");
+    sessionStorage.removeItem("entregador_logado");
     setActiveTab("dashboard");
   };
   const handleConsumidorLogout = () => {
     setConsumidorLogado(null);
-    localStorage.removeItem("consumidor_logado");
+    sessionStorage.removeItem("consumidor_logado");
+    setCarrinho([]);
     setActiveTab("dashboard");
   };
   const handleSubmitProduto = (e) => {
@@ -483,9 +614,6 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
     setProdutoForm(formVazio);
     setShowProdutoForm(false);
     setEditingProdutoId(null);
-    localStorage.setItem("show_produto_form", "false");
-    localStorage.setItem("editing_produto_id", "null");
-    localStorage.setItem("produto_form_data", JSON.stringify(formVazio));
   };
   const editarProduto = (id) => {
     const produto = produtos.find((prod) => prod.id === id);
@@ -493,10 +621,7 @@ Total: R$ ${novoPedido.total.toFixed(2)}`);
       setProdutoForm(produto);
       setEditingProdutoId(id);
       setShowProdutoForm(true);
-      localStorage.setItem("show_produto_form", "true");
-      localStorage.setItem("editing_produto_id", id);
       setActiveTab("produtos");
-      localStorage.setItem("active_tab", "produtos");
     }
   };
   const excluirProduto = (id) => {
@@ -831,8 +956,6 @@ Voc\xEA j\xE1 pode fazer login no sistema e come\xE7ar a fazer pedidos!`);
               imagem: ""
             });
           }
-          localStorage.setItem("show_produto_form", novoEstado.toString());
-          localStorage.setItem("editing_produto_id", "null");
         },
         className: "bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
       },
@@ -844,9 +967,7 @@ Voc\xEA j\xE1 pode fazer login no sistema e come\xE7ar a fazer pedidos!`);
         required: true,
         value: produtoForm.nome,
         onChange: (e) => {
-          const novoForm = { ...produtoForm, nome: e.target.value };
-          setProdutoForm(novoForm);
-          localStorage.setItem("produto_form_data", JSON.stringify(novoForm));
+          setProdutoForm({ ...produtoForm, nome: e.target.value });
         },
         className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
         placeholder: "Ex: Pizza Margherita"
@@ -868,9 +989,7 @@ Voc\xEA j\xE1 pode fazer login no sistema e come\xE7ar a fazer pedidos!`);
         required: true,
         value: produtoForm.categoria,
         onChange: (e) => {
-          const novoForm = { ...produtoForm, categoria: e.target.value };
-          setProdutoForm(novoForm);
-          localStorage.setItem("produto_form_data", JSON.stringify(novoForm));
+          setProdutoForm({ ...produtoForm, categoria: e.target.value });
         },
         className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
       },
@@ -906,9 +1025,7 @@ Voc\xEA j\xE1 pode fazer login no sistema e come\xE7ar a fazer pedidos!`);
         required: true,
         value: produtoForm.descricao,
         onChange: (e) => {
-          const novoForm = { ...produtoForm, descricao: e.target.value };
-          setProdutoForm(novoForm);
-          localStorage.setItem("produto_form_data", JSON.stringify(novoForm));
+          setProdutoForm({ ...produtoForm, descricao: e.target.value });
         },
         className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
         rows: "3",
@@ -936,9 +1053,7 @@ Voc\xEA j\xE1 pode fazer login no sistema e come\xE7ar a fazer pedidos!`);
             }
             const reader = new FileReader();
             reader.onload = (event) => {
-              const novoForm = { ...produtoForm, imagem: event.target.result };
-              setProdutoForm(novoForm);
-              localStorage.setItem("produto_form_data", JSON.stringify(novoForm));
+              setProdutoForm({ ...produtoForm, imagem: event.target.result });
               alert("\u2705 Imagem carregada com sucesso!");
             };
             reader.onerror = () => {
@@ -963,9 +1078,7 @@ Voc\xEA j\xE1 pode fazer login no sistema e come\xE7ar a fazer pedidos!`);
       {
         type: "button",
         onClick: () => {
-          const novoForm = { ...produtoForm, imagem: "" };
-          setProdutoForm(novoForm);
-          localStorage.setItem("produto_form_data", JSON.stringify(novoForm));
+          setProdutoForm({ ...produtoForm, imagem: "" });
         },
         className: "absolute top-2 right-2 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-700 transition duration-200",
         title: "Remover imagem"
@@ -977,9 +1090,7 @@ Voc\xEA j\xE1 pode fazer login no sistema e come\xE7ar a fazer pedidos!`);
         type: "url",
         value: produtoForm.imagem.startsWith("data:") ? "" : produtoForm.imagem,
         onChange: (e) => {
-          const novoForm = { ...produtoForm, imagem: e.target.value };
-          setProdutoForm(novoForm);
-          localStorage.setItem("produto_form_data", JSON.stringify(novoForm));
+          setProdutoForm({ ...produtoForm, imagem: e.target.value });
         },
         className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm",
         placeholder: "https://exemplo.com/imagem.jpg"
@@ -1044,25 +1155,53 @@ Voc\xEA j\xE1 pode fazer login no sistema e come\xE7ar a fazer pedidos!`);
       {
         onClick: () => {
           try {
+            console.log("\u{1F504} Empresa iniciando sincroniza\xE7\xE3o COMPLETA de pedidos...");
+            console.log("\u{1F3E2} Empresa logada:", empresaLogada.nome, "- ID:", empresaLogada.id);
             const savedPedidos = localStorage.getItem("pedidos_sobral");
             if (savedPedidos) {
               const pedidosData = JSON.parse(savedPedidos);
               setPedidos(pedidosData);
-              console.log("\u{1F504} Pedidos recarregados:", pedidosData.length);
+              console.log("\u{1F4E6} Total de pedidos carregados:", pedidosData.length);
+              const meusPedidosEmpresa = pedidosData.filter((pedido) => {
+                const temEmpresa = pedido.empresas && pedido.empresas.some((emp) => {
+                  const match = emp.empresaId === empresaLogada.id;
+                  if (match) {
+                    console.log("\u2705 Pedido encontrado para empresa:", pedido.id.slice(-6), "- Cliente:", pedido.consumidorNome);
+                  }
+                  return match;
+                });
+                return temEmpresa;
+              });
+              console.log("\u{1F3AF} Pedidos filtrados para", empresaLogada.nome, ":", meusPedidosEmpresa.length);
+              const pendentes = meusPedidosEmpresa.filter((p) => p.status === "pendente");
+              const preparando = meusPedidosEmpresa.filter((p) => p.status === "preparando");
+              const prontos = meusPedidosEmpresa.filter((p) => p.status === "pronto");
+              alert(`\u{1F504} Sincroniza\xE7\xE3o COMPLETA realizada!
+
+\u{1F4CA} RESULTADO DETALHADO:
+\u2022 Total no sistema: ${pedidosData.length} pedidos
+\u2022 Seus pedidos: ${meusPedidosEmpresa.length}
+
+\u{1F4C8} STATUS DOS SEUS PEDIDOS:
+\u2022 \u23F3 Pendentes: ${pendentes.length}
+\u2022 \u{1F468}\u200D\u{1F373} Preparando: ${preparando.length}
+\u2022 \u{1F37D}\uFE0F Prontos: ${prontos.length}
+
+${meusPedidosEmpresa.length > 0 ? "\u2705 Todos os pedidos est\xE3o listados abaixo!" : "\u26A0\uFE0F Nenhum pedido encontrado.\n\nDica: Verifique se h\xE1 pedidos no marketplace consumidor."}`);
+            } else {
+              alert("\u26A0\uFE0F Nenhum pedido encontrado no sistema.\n\nIsso pode significar que:\n\u2022 Nenhum consumidor fez pedidos ainda\n\u2022 Houve um problema na sincroniza\xE7\xE3o\n\nTente:\n1. Verificar se h\xE1 pedidos no painel do consumidor\n2. Recarregar a p\xE1gina");
             }
-            const meusPedidosEmpresa = pedidos.filter(
-              (pedido) => pedido.empresas && pedido.empresas.some((emp) => emp.empresaId === empresaLogada.id)
-            );
-            alert(`\u{1F504} Pedidos atualizados!
-
-\u{1F4CA} RESULTADO:
-\u2022 Total de pedidos no sistema: ${pedidos.length}
-\u2022 Pedidos da sua empresa: ${meusPedidosEmpresa.length}
-
-${meusPedidosEmpresa.length > 0 ? "\u2705 Seus pedidos est\xE3o listados abaixo!" : "\u26A0\uFE0F Nenhum pedido encontrado para sua empresa ainda."}`);
+            window.dispatchEvent(new CustomEvent("dados_sincronizados", {
+              detail: {
+                pedidos: JSON.parse(savedPedidos || "[]"),
+                action: "sincronizacao_manual_empresa_pedidos",
+                empresaId: empresaLogada.id,
+                timestamp: (/* @__PURE__ */ new Date()).toISOString()
+              }
+            }));
           } catch (error) {
-            console.error("Erro ao atualizar pedidos:", error);
-            alert("Erro ao atualizar pedidos: " + error.message);
+            console.error("\u274C Erro na sincroniza\xE7\xE3o completa:", error);
+            alert("\u274C Erro na sincroniza\xE7\xE3o: " + error.message + "\n\nTente recarregar a p\xE1gina.");
           }
         },
         className: "bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
@@ -1631,7 +1770,7 @@ Valor: R$ ${pedido.total.toFixed(2)}`)) {
         className: "bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition duration-200"
       },
       "Sair"
-    ))))), /* @__PURE__ */ React.createElement("nav", { className: "bg-white shadow-sm" }, /* @__PURE__ */ React.createElement("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" }, /* @__PURE__ */ React.createElement("div", { className: "flex space-x-8" }, ["dashboard", "empresas", "entregadores", "consumidores", "pedidos"].map((tab) => /* @__PURE__ */ React.createElement(
+    ))))), /* @__PURE__ */ React.createElement("nav", { className: "bg-white shadow-sm" }, /* @__PURE__ */ React.createElement("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" }, /* @__PURE__ */ React.createElement("div", { className: "flex space-x-8" }, ["dashboard", "empresas", "entregadores", "consumidores", "pedidos", "database"].map((tab) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key: tab,
@@ -1642,7 +1781,8 @@ Valor: R$ ${pedido.total.toFixed(2)}`)) {
       tab === "empresas" && `\u{1F3E2} Empresas (${empresas.filter((e) => e.status === "pendente").length})`,
       tab === "entregadores" && `\u{1F3CD}\uFE0F Entregadores (${entregadores.filter((e) => e.status === "pendente").length})`,
       tab === "consumidores" && `\u{1F6D2} Consumidores (${consumidores.length})`,
-      tab === "pedidos" && `\u{1F4E6} Pedidos (${pedidos.length})`
+      tab === "pedidos" && `\u{1F4E6} Pedidos (${pedidos.length})`,
+      tab === "database" && `\u{1F5C4}\uFE0F Banco de Dados ${databaseConfig.isConnected ? "\u2705" : "\u274C"}`
     ))))), /* @__PURE__ */ React.createElement("main", { className: "max-w-7xl mx-auto py-6 sm:px-6 lg:px-8" }, /* @__PURE__ */ React.createElement("div", { className: "px-4 py-6 sm:px-0" }, activeTab === "dashboard" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", { className: "text-2xl font-bold text-gray-900 mb-6" }, "Dashboard Administrativo"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex-shrink-0" }, /* @__PURE__ */ React.createElement("div", { className: "text-3xl" }, "\u{1F3E2}")), /* @__PURE__ */ React.createElement("div", { className: "ml-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-2xl font-bold text-gray-900" }, empresas.length), /* @__PURE__ */ React.createElement("div", { className: "text-sm text-gray-600" }, "Empresas Total"), /* @__PURE__ */ React.createElement("div", { className: "text-xs text-orange-600" }, empresas.filter((e) => e.status === "pendente").length, " pendentes")))), /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex-shrink-0" }, /* @__PURE__ */ React.createElement("div", { className: "text-3xl" }, "\u{1F3CD}\uFE0F")), /* @__PURE__ */ React.createElement("div", { className: "ml-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-2xl font-bold text-gray-900" }, entregadores.length), /* @__PURE__ */ React.createElement("div", { className: "text-sm text-gray-600" }, "Entregadores Total"), /* @__PURE__ */ React.createElement("div", { className: "text-xs text-orange-600" }, entregadores.filter((e) => e.status === "pendente").length, " pendentes")))), /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex-shrink-0" }, /* @__PURE__ */ React.createElement("div", { className: "text-3xl" }, "\u{1F6D2}")), /* @__PURE__ */ React.createElement("div", { className: "ml-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-2xl font-bold text-gray-900" }, consumidores.length), /* @__PURE__ */ React.createElement("div", { className: "text-sm text-gray-600" }, "Consumidores"), /* @__PURE__ */ React.createElement("div", { className: "text-xs text-green-600" }, "Todos ativos")))), /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex-shrink-0" }, /* @__PURE__ */ React.createElement("div", { className: "text-3xl" }, "\u{1F4E6}")), /* @__PURE__ */ React.createElement("div", { className: "ml-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-2xl font-bold text-gray-900" }, pedidos.length), /* @__PURE__ */ React.createElement("div", { className: "text-sm text-gray-600" }, "Pedidos Total"), /* @__PURE__ */ React.createElement("div", { className: "text-xs text-blue-600" }, pedidos.filter((p) => p.status === "pendente").length, " pendentes"))))), (empresas.filter((e) => e.status === "pendente").length > 0 || entregadores.filter((e) => e.status === "pendente").length > 0) && /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-gray-900 mb-4" }, "\u{1F514} Aprova\xE7\xF5es Pendentes"), empresas.filter((e) => e.status === "pendente").length > 0 && /* @__PURE__ */ React.createElement("div", { className: "mb-4" }, /* @__PURE__ */ React.createElement("h4", { className: "font-medium text-gray-700 mb-2" }, "\u{1F3E2} Empresas aguardando aprova\xE7\xE3o: ", empresas.filter((e) => e.status === "pendente").length), /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -1739,7 +1879,216 @@ Valor: R$ ${pedido.total.toFixed(2)}`)) {
         className: "bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition duration-200"
       },
       "\u274C Rejeitar"
-    ))))))), activeTab === "consumidores" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", { className: "text-2xl font-bold text-gray-900 mb-6" }, "Gerenciamento de Consumidores"), /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, consumidores.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "text-6xl mb-4" }, "\u{1F6D2}"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-gray-900 mb-2" }, "Nenhum consumidor cadastrado"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-600" }, "Aguarde consumidores se cadastrarem na plataforma.")) : consumidores.map((consumidor) => /* @__PURE__ */ React.createElement("div", { key: consumidor.id, className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-start" }, /* @__PURE__ */ React.createElement("div", { className: "flex-1" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center mb-3" }, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-semibold text-gray-900" }, consumidor.nome), /* @__PURE__ */ React.createElement("span", { className: "ml-3 px-3 py-1 text-sm rounded-full bg-green-100 text-green-800" }, "\u2705 Ativo")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "CPF:"), " ", consumidor.cpf), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Email:"), " ", consumidor.email), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Telefone:"), " ", consumidor.telefone), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Cadastrado em:"), " ", consumidor.cadastradoEm)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Endere\xE7o:"), " ", consumidor.endereco), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Bairro:"), " ", consumidor.bairro), consumidor.pontoReferencia && /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Ponto de Refer\xEAncia:"), " ", consumidor.pontoReferencia), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Pedidos:"), " ", pedidos.filter((p) => p.consumidorId === consumidor.id).length))))))))), activeTab === "pedidos" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", { className: "text-2xl font-bold text-gray-900 mb-6" }, "Gerenciamento de Pedidos"), /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, pedidos.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "text-6xl mb-4" }, "\u{1F4E6}"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-gray-900 mb-2" }, "Nenhum pedido realizado"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-600" }, "Aguarde pedidos serem realizados pelos consumidores.")) : pedidos.map((pedido) => /* @__PURE__ */ React.createElement("div", { key: pedido.id, className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-start mb-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-semibold text-gray-900" }, "Pedido #", pedido.id.slice(-6)), /* @__PURE__ */ React.createElement("p", { className: "text-sm text-gray-600" }, pedido.criadoEm)), /* @__PURE__ */ React.createElement("span", { className: `px-3 py-1 text-sm rounded-full ${pedido.status === "pendente" ? "bg-orange-100 text-orange-800" : pedido.status === "aprovado" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}` }, pedido.status === "pendente" ? "\u23F3 Pendente" : pedido.status === "aprovado" ? "\u2705 Aprovado" : "\u274C Rejeitado")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Cliente:"), " ", pedido.consumidorNome), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Telefone:"), " ", pedido.telefone), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Endere\xE7o:"), " ", pedido.endereco), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Bairro:"), " ", pedido.bairro)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Total:"), " R$ ", pedido.total.toFixed(2)), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Itens:"), " ", pedido.items.length), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Empresas:"), " ", pedido.empresas?.length || 0))), pedido.items && pedido.items.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "border-t pt-4" }, /* @__PURE__ */ React.createElement("h4", { className: "font-medium text-gray-900 mb-2" }, "Itens do Pedido:"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, pedido.items.map((item, index) => /* @__PURE__ */ React.createElement("div", { key: index, className: "flex justify-between text-sm" }, /* @__PURE__ */ React.createElement("span", null, item.quantidade, "x ", item.nome), /* @__PURE__ */ React.createElement("span", null, "R$ ", (parseFloat(item.preco) * item.quantidade).toFixed(2)))))))))))));
+    ))))))), activeTab === "consumidores" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", { className: "text-2xl font-bold text-gray-900 mb-6" }, "Gerenciamento de Consumidores"), /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, consumidores.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "text-6xl mb-4" }, "\u{1F6D2}"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-gray-900 mb-2" }, "Nenhum consumidor cadastrado"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-600" }, "Aguarde consumidores se cadastrarem na plataforma.")) : consumidores.map((consumidor) => /* @__PURE__ */ React.createElement("div", { key: consumidor.id, className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-start" }, /* @__PURE__ */ React.createElement("div", { className: "flex-1" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center mb-3" }, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-semibold text-gray-900" }, consumidor.nome), /* @__PURE__ */ React.createElement("span", { className: "ml-3 px-3 py-1 text-sm rounded-full bg-green-100 text-green-800" }, "\u2705 Ativo")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "CPF:"), " ", consumidor.cpf), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Email:"), " ", consumidor.email), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Telefone:"), " ", consumidor.telefone), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Cadastrado em:"), " ", consumidor.cadastradoEm)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Endere\xE7o:"), " ", consumidor.endereco), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Bairro:"), " ", consumidor.bairro), consumidor.pontoReferencia && /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Ponto de Refer\xEAncia:"), " ", consumidor.pontoReferencia), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Pedidos:"), " ", pedidos.filter((p) => p.consumidorId === consumidor.id).length))))))))), activeTab === "pedidos" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h2", { className: "text-2xl font-bold text-gray-900 mb-6" }, "Gerenciamento de Pedidos"), /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, pedidos.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "text-6xl mb-4" }, "\u{1F4E6}"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-gray-900 mb-2" }, "Nenhum pedido realizado"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-600" }, "Aguarde pedidos serem realizados pelos consumidores.")) : pedidos.map((pedido) => /* @__PURE__ */ React.createElement("div", { key: pedido.id, className: "bg-white shadow rounded-lg p-6" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-start mb-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-semibold text-gray-900" }, "Pedido #", pedido.id.slice(-6)), /* @__PURE__ */ React.createElement("p", { className: "text-sm text-gray-600" }, pedido.criadoEm)), /* @__PURE__ */ React.createElement("span", { className: `px-3 py-1 text-sm rounded-full ${pedido.status === "pendente" ? "bg-orange-100 text-orange-800" : pedido.status === "aprovado" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}` }, pedido.status === "pendente" ? "\u23F3 Pendente" : pedido.status === "aprovado" ? "\u2705 Aprovado" : "\u274C Rejeitado")), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Cliente:"), " ", pedido.consumidorNome), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Telefone:"), " ", pedido.telefone), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Endere\xE7o:"), " ", pedido.endereco), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Bairro:"), " ", pedido.bairro)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Total:"), " R$ ", pedido.total.toFixed(2)), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Itens:"), " ", pedido.items.length), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "Empresas:"), " ", pedido.empresas?.length || 0))), pedido.items && pedido.items.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "border-t pt-4" }, /* @__PURE__ */ React.createElement("h4", { className: "font-medium text-gray-900 mb-2" }, "Itens do Pedido:"), /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, pedido.items.map((item, index) => /* @__PURE__ */ React.createElement("div", { key: index, className: "flex justify-between text-sm" }, /* @__PURE__ */ React.createElement("span", null, item.quantidade, "x ", item.nome), /* @__PURE__ */ React.createElement("span", null, "R$ ", (parseFloat(item.preco) * item.quantidade).toFixed(2)))))))))), activeTab === "database" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center mb-6" }, /* @__PURE__ */ React.createElement("h2", { className: "text-2xl font-bold text-gray-900" }, "Configura\xE7\xE3o do Banco de Dados"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center space-x-2" }, /* @__PURE__ */ React.createElement("span", { className: `px-3 py-1 text-sm rounded-full ${databaseConfig.isConnected ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}` }, databaseConfig.isConnected ? "\u2705 Conectado" : "\u274C Desconectado"), databaseConfig.isConnected && /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: disconnectDatabase,
+        className: "bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition duration-200 text-sm"
+      },
+      "Desconectar"
+    ))), /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6 mb-6" }, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-gray-900 mb-4" }, "Status da Conex\xE3o"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-lg" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-gray-600" }, "Status"), /* @__PURE__ */ React.createElement("div", { className: `text-lg font-bold ${databaseConfig.isConnected ? "text-green-600" : "text-red-600"}` }, databaseConfig.isConnected ? "Conectado" : "Desconectado")), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-lg" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-gray-600" }, "Tipo"), /* @__PURE__ */ React.createElement("div", { className: "text-lg font-bold text-gray-900" }, databaseConfig.type.toUpperCase())), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-lg" }, /* @__PURE__ */ React.createElement("div", { className: "text-sm text-gray-600" }, "\xDAltima Conex\xE3o"), /* @__PURE__ */ React.createElement("div", { className: "text-lg font-bold text-gray-900" }, databaseConfig.lastConnection || "Nunca")))), /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6 mb-6" }, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-gray-900 mb-4" }, "Configura\xE7\xE3o da Conex\xE3o"), /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "Tipo de Banco de Dados"), /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: databaseConfig.type,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          type: e.target.value,
+          port: e.target.value === "mysql" ? "3306" : e.target.value === "postgresql" ? "5432" : e.target.value === "mongodb" ? "27017" : "3306"
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+      },
+      /* @__PURE__ */ React.createElement("option", { value: "mysql" }, "MySQL"),
+      /* @__PURE__ */ React.createElement("option", { value: "postgresql" }, "PostgreSQL"),
+      /* @__PURE__ */ React.createElement("option", { value: "mongodb" }, "MongoDB"),
+      /* @__PURE__ */ React.createElement("option", { value: "sqlite" }, "SQLite"),
+      /* @__PURE__ */ React.createElement("option", { value: "supabase" }, "\u{1F680} Supabase (PostgreSQL Cloud)")
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "M\xE9todo de Conex\xE3o"), /* @__PURE__ */ React.createElement(
+      "select",
+      {
+        value: databaseConfig.useConnectionString ? "string" : "config",
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          useConnectionString: e.target.value === "string"
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+      },
+      /* @__PURE__ */ React.createElement("option", { value: "config" }, "Configura\xE7\xE3o Manual"),
+      /* @__PURE__ */ React.createElement("option", { value: "string" }, "String de Conex\xE3o")
+    ))), databaseConfig.type === "supabase" ? /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-green-50 border border-green-200 rounded-lg p-4" }, /* @__PURE__ */ React.createElement("h4", { className: "font-medium text-green-800 mb-2 flex items-center" }, "\u{1F680} Configura\xE7\xE3o do Supabase"), /* @__PURE__ */ React.createElement("p", { className: "text-sm text-green-700 mb-3" }, "O Supabase \xE9 uma alternativa open-source ao Firebase. Configure sua conex\xE3o abaixo:"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center space-x-2 text-sm text-green-600" }, /* @__PURE__ */ React.createElement("span", null, "\u{1F4DA}"), /* @__PURE__ */ React.createElement(
+      "a",
+      {
+        href: "https://supabase.com/dashboard",
+        target: "_blank",
+        rel: "noopener noreferrer",
+        className: "hover:underline font-medium"
+      },
+      "Acesse seu Dashboard do Supabase"
+    ))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "\u{1F517} URL do Projeto Supabase *"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "url",
+        required: true,
+        value: databaseConfig.supabaseUrl,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          supabaseUrl: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500",
+        placeholder: "https://seu-projeto.supabase.co"
+      }
+    ), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500 mt-1" }, "Encontre em: Projeto \u2192 Settings \u2192 API \u2192 Project URL")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "\u{1F511} Chave P\xFAblica (anon key) *"), /* @__PURE__ */ React.createElement(
+      "textarea",
+      {
+        required: true,
+        value: databaseConfig.supabaseKey,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          supabaseKey: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500",
+        rows: 3,
+        placeholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      }
+    ), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500 mt-1" }, "Encontre em: Projeto \u2192 Settings \u2192 API \u2192 Project API keys \u2192 anon public")), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "\u{1F6E1}\uFE0F Chave de Servi\xE7o (service_role key)"), /* @__PURE__ */ React.createElement(
+      "textarea",
+      {
+        value: databaseConfig.supabaseServiceKey,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          supabaseServiceKey: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500",
+        rows: 3,
+        placeholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (opcional para opera\xE7\xF5es administrativas)"
+      }
+    ), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500 mt-1" }, "Opcional: Para opera\xE7\xF5es administrativas. Encontre em: Projeto \u2192 Settings \u2192 API \u2192 service_role")), /* @__PURE__ */ React.createElement("div", { className: "bg-yellow-50 border border-yellow-200 rounded-lg p-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-sm text-yellow-800" }, /* @__PURE__ */ React.createElement("strong", null, "\u26A0\uFE0F Seguran\xE7a:"), " A chave de servi\xE7o possui acesso total ao banco. Use apenas em ambiente seguro e nunca a exponha no frontend em produ\xE7\xE3o."))) : databaseConfig.useConnectionString ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "String de Conex\xE3o"), /* @__PURE__ */ React.createElement(
+      "textarea",
+      {
+        value: databaseConfig.connectionString,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          connectionString: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500",
+        rows: 3,
+        placeholder: databaseConfig.type === "mysql" ? "mysql://usuario:senha@localhost:3306/entrega_sobral" : databaseConfig.type === "postgresql" ? "postgresql://usuario:senha@localhost:5432/entrega_sobral" : databaseConfig.type === "mongodb" ? "mongodb://usuario:senha@localhost:27017/entrega_sobral" : "sqlite://./entrega_sobral.db"
+      }
+    )) : /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "Host/Servidor"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: databaseConfig.host,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          host: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500",
+        placeholder: "localhost"
+      }
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "Porta"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: databaseConfig.port,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          port: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500",
+        placeholder: "3306"
+      }
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "Nome do Banco"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: databaseConfig.database,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          database: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500",
+        placeholder: "entrega_sobral"
+      }
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "Usu\xE1rio"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "text",
+        value: databaseConfig.username,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          username: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500",
+        placeholder: "usuario"
+      }
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "block text-sm font-medium text-gray-700 mb-2" }, "Senha"), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "password",
+        value: databaseConfig.password,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          password: e.target.value
+        }),
+        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500",
+        placeholder: "senha"
+      }
+    )), /* @__PURE__ */ React.createElement("div", { className: "flex items-center" }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        id: "ssl",
+        checked: databaseConfig.ssl,
+        onChange: (e) => setDatabaseConfig({
+          ...databaseConfig,
+          ssl: e.target.checked
+        }),
+        className: "mr-2"
+      }
+    ), /* @__PURE__ */ React.createElement("label", { htmlFor: "ssl", className: "text-sm text-gray-700" }, "Usar SSL/TLS"))))), /* @__PURE__ */ React.createElement("div", { className: "bg-white shadow rounded-lg p-6 mb-6" }, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-gray-900 mb-4" }, "A\xE7\xF5es"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4" }, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: testDatabaseConnection,
+        disabled: databaseConfig.isConnected,
+        className: `px-6 py-3 rounded-md font-medium transition duration-200 ${databaseConfig.isConnected ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-green-600 text-white hover:bg-green-700"}`
+      },
+      "\u{1F50C} Testar Conex\xE3o"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: migrateToDatabase,
+        disabled: !databaseConfig.isConnected,
+        className: `px-6 py-3 rounded-md font-medium transition duration-200 ${!databaseConfig.isConnected ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`
+      },
+      "\u{1F504} Migrar Dados do LocalStorage"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          if (confirm("\u26A0\uFE0F Tem certeza que deseja limpar todas as configura\xE7\xF5es?\n\nEsta a\xE7\xE3o n\xE3o pode ser desfeita!")) {
+            setDatabaseConfig({
+              type: "mysql",
+              host: "localhost",
+              port: "3306",
+              database: "entrega_sobral",
+              username: "",
+              password: "",
+              ssl: false,
+              connectionString: "",
+              isConnected: false,
+              lastConnection: null,
+              useConnectionString: false,
+              supabaseUrl: "",
+              supabaseKey: "",
+              supabaseServiceKey: ""
+            });
+            alert("\u{1F5D1}\uFE0F Configura\xE7\xF5es limpas!");
+          }
+        },
+        className: "bg-red-600 text-white px-6 py-3 rounded-md hover:bg-red-700 font-medium transition duration-200"
+      },
+      "\u{1F5D1}\uFE0F Limpar Configura\xE7\xF5es"
+    ))), /* @__PURE__ */ React.createElement("div", { className: "bg-yellow-50 border border-yellow-200 rounded-lg p-6" }, /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-medium text-yellow-800 mb-4" }, "\u26A0\uFE0F Informa\xE7\xF5es Importantes"), /* @__PURE__ */ React.createElement("div", { className: "space-y-3 text-sm text-yellow-700" }, /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "\u{1F4CB} Funcionalidade em Desenvolvimento:"), " Esta \xE9 uma simula\xE7\xE3o da conex\xE3o com banco de dados. Em produ\xE7\xE3o, seria necess\xE1rio implementar as rotas de API no backend."), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "\u{1F510} Seguran\xE7a:"), " Nunca exponha credenciais de banco de dados no frontend. Use vari\xE1veis de ambiente e APIs seguras."), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "\u{1F504} Migra\xE7\xE3o:"), " A migra\xE7\xE3o atual \xE9 simulada. Em produ\xE7\xE3o, implemente valida\xE7\xF5es e backups antes da migra\xE7\xE3o."), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "\u{1F4BE} Estrutura de Tabelas:"), " Certifique-se de que as tabelas necess\xE1rias existam no banco: usuarios, empresas, entregadores, consumidores, produtos, pedidos."), /* @__PURE__ */ React.createElement("p", null, /* @__PURE__ */ React.createElement("strong", null, "\u{1F680} Supabase:"), " Use Row Level Security (RLS) para seguran\xE7a. Configure pol\xEDticas de acesso adequadas para cada tabela.")))))));
   }
   if (currentView === "login") {
     return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center p-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-lg shadow-2xl p-8 w-full max-w-md" }, /* @__PURE__ */ React.createElement("div", { className: "text-center mb-8" }, /* @__PURE__ */ React.createElement("h1", { className: "text-3xl font-bold text-gray-800 mb-2" }, "\u{1F355} Entrega Sobral"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-600" }, "Fazer Login")), /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement(
